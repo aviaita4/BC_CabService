@@ -49,11 +49,6 @@ sleep(500).then(() => {
       res.send('Hello GET');
    })
 
-   app.get('/getTotalNumReqs', function (req, res) {
-      num_reqs = contractInstance.getNumRequests();
-      res.send('Toral Requests: ' + num_reqs);
-   })
-
    // RIDER API -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
    // Create new ride request
@@ -298,13 +293,19 @@ sleep(500).then(() => {
       result.price = req.query.distance * price_per_mile;
 
       res.send(JSON.stringify(result, null, 3));
-      
+
       console.log('Price calculated!');
    })
 
    // Transparency API ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
    // API v1 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+   app.get('/getTotalNumReqs', function (req, res) {
+      num_reqs = contractInstance.getNumRequests();
+      res.send('Toral Requests: ' + num_reqs);
+   })
+
    app.post('api/v1/createNewRequest', function (req, res) {
       console.log("Creating brand new request!");
 
