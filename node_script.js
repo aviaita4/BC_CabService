@@ -7,6 +7,7 @@ var app = express();
 var bodyParser  = require('body-parser');
 var mongo = require('mongodb');
 var MongoClient = require('mongodb').MongoClient;
+var ObjectId = require('mongodb').ObjectId; 
 var url = "mongodb://localhost:27017/";
 
 var dbo = {};
@@ -182,31 +183,34 @@ sleep(500).then(() => {
    
       Headers: Content-Type : application/json
       Input JSON: driver_id, driver_location
-      Response JSON: 
-
-      {
-         "booking_status" : "successful" / "unsuccessful"
-      }
+      
 
    */
    app.post('/api/v2/driver/updateLocation', function (req, res) {
       console.log("Updating driver location for driver : " + req.body.driver_id);
 
-      result = {
-         "booking_status" : "unsuccessful"
-      }
+      res_result = {};
+
+      res_result.message = "Some issue faced!"
 
       // Update in Mongo
+      dbo.collection("Drivers").updateOne({_id: ObjectId(req.body.driver_id)}, {$set:{curr_location_lat : req.body.driver_location.lat, curr_location_lon : req.body.driver_location.lon}}, function(err, result){
+         if(err){
+            console.log(err);
 
+            res.send(JSON.stringify(res_result, null, 3));
+            console.log("Update location for driver " + req.body.driver_id + " failed!");  
+         }
+         else {
+            // Send response 
 
-      // No updates to Blockchain
-      //contractInstance.createNewRequest.sendTransaction(request_id, req.body.rider_id, req.body.rider_source, req.body.rider_destination, {gas:max_gas_allowed});
+            res_result.message = "Location uodated successfully";
+            res.send(JSON.stringify(res_result, null, 3));
+            console.log("Update location for driver " + req.body.driver_id + " was successful!");
+         } 
 
-      // Send response
-
-      res.send(JSON.stringify(result, null, 3));
-      console.log("Update location for driver " + req.body.driver_id + " was " + result.booking_status);
-   })
+      });
+   });
 
 
    // Poll nearby rides for a rider
@@ -218,33 +222,72 @@ sleep(500).then(() => {
 
       [
          {
-            "request_id": "",
+            "quote_id"
             "request_source": "",
             "request_destination": "",
             "request_default_amount": ""
          },
          {
-            "request_id": "",
+            "quote_id": "",
             "request_source": "",
             "request_destination": "",
             "request_default_amount": ""
          }
       ]
 
+      // selected status
+      {
+         "req_id": ""
+         "pickup_location": ""
+      }
+
    */
    app.get('/api/v2/driver/pollRides', function (req, res) {
       console.log("Searching rides for driver: " + req.query.driver_id);
 
-      results = [];
       // Get results from Mongo DB
+      dbo.collection("Drivers").findOne({_id: ObjectId(req.query.driver_id)} , function(err, result){
+         if(err)console.log(err);
+         else {
 
+            if(result == null){
+               return;
+            }
 
-      // Do not neet to do anything in Blockchain
-      //contractInstance.createNewRequest.sendTransaction(request_id, req.body.rider_id, req.body.rider_source, req.body.rider_destination, {gas:max_gas_allowed});
+            console.log(result);
 
-      // Send response
-      res.send(JSON.stringify(results, null, 3));
-      console.log("Search rides for driver: "+ req.query.driver_id + " done");
+            if(result.status === "idle"){
+               dbo.collection("Quotations").find({driver_id: req.query.driver_id, invalid: null, quote_amount: null}).toArray(function(err, results){
+
+               // Send response
+
+               console.log(results);
+
+               res.send(JSON.stringify(results, null, 3));
+               console.log("Search rides for driver: "+ req.query.driver_id + " done");
+
+               });
+            }else if(result.status === "selected"){
+               req_id = result.current_req_id;
+
+               dbo.collection("Ride_Request").findOne({_id: ObjectId(req_id)}, function(err, result){
+                  if(err) console.log(err);
+                  else{
+                     // Send response
+                     res_result = {};
+                     res_result.req_id = req_id;
+                     res_result.pickup_location = {
+                        "lat" : result.src_lat,
+                        "lon" : result.src_lon
+                     }
+                     res.send(JSON.stringify(res_result, null, 3));
+                  }
+               });
+            }else{
+               res.send("Sorry you got no rides!");
+            }
+         }
+      });
    })
 
 
@@ -252,38 +295,99 @@ sleep(500).then(() => {
    /*
    
       Headers: Content-Type : application/json
-      Input JSON: driver_id, request_id, quotation_amount
+      Input JSON: driver_id, request_id, quotation_amount, quotation_id
       Response JSON: 
          
-      {
-         "quotation_id" : ""
-      }
+      Quotation record completely
 
    */
    app.post('/api/v2/driver/addQuotation', function (req, res) {
       console.log("Creating quotation for driver : " + req.body.driver_id + " for the ride: " + req.body.request_id);
 
-      result = {
-         "quotation_id" : -1
-      }
-      // Logic for mongo DB
-
       // Update result
-      quotation_id = -1;
+      dbo.collection("Quotations").updateOne({_id: ObjectId(req.body.quote_id)}, {$set: {quote_amount : req.body.quotation_amount}}, function(err, result) {
+         if(err)console.log(err);
+         else {
+               dbo.collection("Quotations").findOne({_id: ObjectId(req.body.quote_id)} , function(err, result){
+                  if(err)console.log(err);
+                  else {
+                        // Update final quotation in Blockchain
+                        //contractInstance.addQuotation.sendTransaction(req.body.request_id, quotation_id, req.body.driver_id, req.body.quotation_amount, {gas:max_gas_allowed});
 
-      result.quotation_id = quotation_id
-
-      // Update final quotation in Blockchain
-      
-      contractInstance.addQuotation.sendTransaction(req.body.request_id, quotation_id, req.body.driver_id, req.body.quotation_amount, {gas:max_gas_allowed});
-      
-
-      // Send response
-      res.send(JSON.stringify(result, null, 3));
-      console.log("Quotatation added :" + quotation_id + " for the ride: " + req.body.request_id + " by " + req.body.driver_id);
+                        // Send response
+                        res.send(JSON.stringify(result, null, 3));
+                        console.log("Quotatation added :" + quotation_id + " for the ride: " + req.body.request_id + " by " + req.body.driver_id);
+                  }
+               });
+         }
+      });
    })
 
+   // Registration API ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+   // Register Rider
+   /*
+   
+      Headers: Content-Type : application/json
+      Input JSON: rider_name
+
+   */
+
+   app.post('/api/v4/register/rider', function (req, res) {
+
+      console.log("Registration Started!");
+
+      res_result = {
+         "rider_id" : null,
+         "rider_name" : req.body.rider_name
+      };
+
+      dbo.collection("Riders").insertOne({rider_name: req.body.rider_name}, function(err, result) {
+         if(err){
+            console.log(err);
+            res.send("Registration unsuccessful! Sorry.. Please try again!");
+         }
+         else {
+            res_result.rider_id = result["ops"][0]["_id"];
+            res.send(JSON.stringify(res_result, null, 3));
+         }
+      });
+      
+      console.log("Registration Process Done!");
+
+   });
+
+   // Register Driver
+   /*
+   
+      Headers: Content-Type : application/json
+      Input JSON: driver_name
+
+   */
+
+   app.post('/api/v4/register/driver', function (req, res) {
+
+      console.log("Registration Started!");
+
+      res_result = {
+         "driver_id" : null,
+         "driver_name" : req.body.driver_name
+      };
+
+      dbo.collection("Drivers").insertOne({driver_name: req.body.driver_name, status : "idle"}, function(err, result) {
+         if(err){
+            console.log(err);
+            res.send("Registration unsuccessful! Sorry.. Please try again!");
+         }
+         else {
+            res_result.driver_id = result["ops"][0]["_id"];
+            res.send(JSON.stringify(res_result, null, 3));
+         }
+      });
+      
+      console.log("Registration Process Done!");
+
+   });
 
    // Default Pricing API ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -304,7 +408,7 @@ sleep(500).then(() => {
    app.get('/api/v3/price', function (req, res) {
       console.log("Calculating price from: " + req.query.source + " to " + req.query.destination + " with distance: " + req.query.distance);
 
-      price_per_mile = 10
+      price_per_mile = 10;
 
       result = {
          "price" : 0,
