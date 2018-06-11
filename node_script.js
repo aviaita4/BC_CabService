@@ -5,6 +5,14 @@ var fs = require('fs');
 var express = require('express');
 var app = express();
 var bodyParser  = require('body-parser');
+var mongo = require('mongodb');
+var MongoClient = require('mongodb').MongoClient;
+var url = "mongodb://localhost:27017/";
+
+var dbo = {};
+
+database_name = "book_db";
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
   extended: true
@@ -43,6 +51,11 @@ sleep(500).then(() => {
    max_gas_allowed = 110000;
 
 
+   MongoClient.connect(url, function(err, db) {
+      if (err) throw err;
+      dbo = db.db(database_name);;
+   });
+
    // This responds with "Hello World" on the homepage
    app.get('/', function (req, res) {
       console.log("Got a GET request for the homepage");
@@ -62,25 +75,33 @@ sleep(500).then(() => {
       }
 
    */
-   app.post('api/v2/rider/newRequest', function (req, res) {
+   app.post('/api/v2/rider/newRequest', function (req, res) {
       console.log("Creating new ride request for : " + req.body.rider_id);
 
       // Update in Mongo
+
       // Get request_id
-      request_id = 0;
+      request_id = -1;
 
+      var myobj = {  rider_id: req.body.rider_id, src_lat : req.body.rider_source.lat, src_lon : req.body.rider_source.lon, des_lat: req.body.rider_destination.lat, des_lon: req.body.rider_destination.lon};
+      dbo.collection("Ride_Request").insert(myobj, function(err, result) {
+         if(err)console.log(err);
+         else {
+            request_id = result["ops"][0]["_id"];
+         
+            // Update in Blockchain
+            //contractInstance.createNewRequest.sendTransaction(request_id, req.body.rider_id, req.body.rider_source, req.body.rider_destination, {gas:max_gas_allowed});
 
-      // Update in Blockchain
-      contractInstance.createNewRequest.sendTransaction(request_id, req.body.rider_id, req.body.rider_source, req.body.rider_destination, {gas:max_gas_allowed});
+            // Send response
 
-      // Send response
+            result = {
+               "request_id" : request_id
+            }
 
-      result = {
-         "request_id" : request_id
-      }
-
-      res.send(JSON.stringify(result, null, 3));
-      console.log("New ride request created: " + request_id + " for rider: " + req.body.rider_id);
+            res.send(JSON.stringify(result, null, 3));
+            console.log("New ride request created: " + request_id + " for rider: " + req.body.rider_id);
+        }
+      });
    })
 
    // Poll quotations for created ride request
@@ -106,7 +127,7 @@ sleep(500).then(() => {
       ]
 
    */
-   app.get('api/v2/rider/pollQuotations', function (req, res) {
+   app.get('/api/v2/rider/pollQuotations', function (req, res) {
       console.log("Polling rides for rider: " + req.query.rider_id + " for the ride: " + req.query.request_id);
 
       results = [];
@@ -132,11 +153,11 @@ sleep(500).then(() => {
       }
 
    */
-   app.post('api/v2/rider/selectRide', function (req, res) {
+   app.post('/api/v2/rider/selectRide', function (req, res) {
       console.log("Selecting/Finalizing ride(quotation) : " + req.query.final_quotation_id + " for rider: " + req.query.rider_id);
 
       result = {
-         "booking_status" : "unsuccessful";
+         "booking_status" : "unsuccessful"
       }
       // Logic for mongo DB
 
@@ -168,7 +189,7 @@ sleep(500).then(() => {
       }
 
    */
-   app.post('api/v2/driver/updateLocation', function (req, res) {
+   app.post('/api/v2/driver/updateLocation', function (req, res) {
       console.log("Updating driver location for driver : " + req.body.driver_id);
 
       result = {
@@ -211,7 +232,7 @@ sleep(500).then(() => {
       ]
 
    */
-   app.get('api/v2/driver/pollRides', function (req, res) {
+   app.get('/api/v2/driver/pollRides', function (req, res) {
       console.log("Searching rides for driver: " + req.query.driver_id);
 
       results = [];
@@ -239,11 +260,11 @@ sleep(500).then(() => {
       }
 
    */
-   app.post('api/v2/driver/addQuotation', function (req, res) {
+   app.post('/api/v2/driver/addQuotation', function (req, res) {
       console.log("Creating quotation for driver : " + req.body.driver_id + " for the ride: " + req.body.request_id);
 
       result = {
-         "quotation_id" : -1;
+         "quotation_id" : -1
       }
       // Logic for mongo DB
 
@@ -280,14 +301,14 @@ sleep(500).then(() => {
 
    */
 
-   app.get('api/v3/price', function (req, res) {
+   app.get('/api/v3/price', function (req, res) {
       console.log("Calculating price from: " + req.query.source + " to " + req.query.destination + " with distance: " + req.query.distance);
 
       price_per_mile = 10
 
       result = {
-         "price" : 0
-         "cuurency" : "USD"
+         "price" : 0,
+         "currency" : "USD"
       }
 
       result.price = req.query.distance * price_per_mile;
@@ -306,7 +327,7 @@ sleep(500).then(() => {
       res.send('Toral Requests: ' + num_reqs);
    })
 
-   app.post('api/v1/createNewRequest', function (req, res) {
+   app.post('/api/v1/createNewRequest', function (req, res) {
       console.log("Creating brand new request!");
 
       contractInstance.createNewRequest.sendTransaction(req.body.request_id, req.body.rider_id, req.body.source, req.body.destination, {gas:max_gas_allowed});
@@ -314,7 +335,7 @@ sleep(500).then(() => {
       res.send('New Request Created');
    })   
 
-   app.post('api/v1/addQuotation', function (req, res) {
+   app.post('/api/v1/addQuotation', function (req, res) {
       console.log("Creating quotation for request");
 
       contractInstance.addQuotation.sendTransaction(req.body.request_id, req.body.quotation_id, req.body.driver_id, req.body.quotation_amount, {gas:max_gas_allowed});
@@ -322,7 +343,7 @@ sleep(500).then(() => {
       res.send('Created a quotation!');
    })
 
-   app.get('api/v1/getAllQuotationDetails', function (req, res) {
+   app.get('/api/v1/getAllQuotationDetails', function (req, res) {
       console.log("Getting all quotation details of a request");
 
       result = [];
@@ -352,7 +373,3 @@ sleep(500).then(() => {
    })
 
 });
-
-
-
-
