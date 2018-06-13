@@ -187,8 +187,8 @@ sleep(500).then(() => {
       
       // Get results from Mongo DB
       qoute_amount: {$ne: null}
-      //dbo.collection("Quotations").find({req_id: req.query.request_id , qoute_amount: {$ne: null}}).toArray(function(err, results) {
-      dbo.collection("Quotations").find({req_id: req.query.request_id}).toArray(function(err, results) {
+      dbo.collection("Quotations").find({req_id: req.query.request_id , quote_amount: {$ne: null}}).toArray(function(err, results) {
+      //dbo.collection("Quotations").find({req_id: req.query.request_id}).toArray(function(err, results) {
         if(err) console.log(err);
         else{
           all_quotations = results;
@@ -197,6 +197,7 @@ sleep(500).then(() => {
               console.log(err);
               res.send(JSON.stringify("Sorry, no nearby drivers found..", null, 3));
               console.log("Polling drivers " + " None exist!");
+
           } else {
             
             driveridlist = results.map(function(doc){
@@ -353,7 +354,7 @@ sleep(500).then(() => {
          else {
             // Send response 
 
-            res_result.message = "Location uodated successfully";
+            res_result.message = "Location updated successfully";
             res.send(JSON.stringify(res_result, null, 3));
             console.log("Update location for driver " + req.body.driver_id + " was successful!");
          } 
@@ -400,7 +401,7 @@ sleep(500).then(() => {
          else {
 
             if(result == null){
-               return;
+               res.send("Driver ID not found");
             }
 
             console.log(result);

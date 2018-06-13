@@ -5,11 +5,14 @@ contract Booking {
 
   struct Booking_request{
 
-    uint8 request_id;
-    uint8 rider_id;
-    uint8 source;
-    uint8 destination;
-    uint8 chosen_quotation_id;
+    bytes32 request_id;
+    bytes32 rider_id;
+    bytes32 source_lat;
+    bytes32 source_lon;
+    bytes32 destination_lat;
+    bytes32 destination_lon;
+
+    bytes32 chosen_quotation_id;
 
     bytes32 quotations_head;
     uint8 num_quotations;
@@ -19,34 +22,29 @@ contract Booking {
 
   struct Quotation{
 
-    uint8 quotation_id;
-    uint8 driver_id;
+    bytes32 quotation_id;
+    bytes32 driver_id;
     uint8 quotation_amount;
 
     bytes32 next;
   }
 
   uint8 public num_booking_requests;
-  mapping (uint8 => Booking_request) public booking_requests;
-
-  mapping (uint8 => uint8) public test_mapping;
-  
+  mapping (bytes32 => Booking_request) public booking_requests;  
 
   constructor() public{
     num_booking_requests = 0;
   }
 
-  function getNumRequests() view public returns (uint8){
-    return num_booking_requests;
-  }
+  // STORAGE API ----------------------------------------------------------------------------------------------------------
 
-  function createNewRequest(uint8 request_id, uint8 rider_id, uint8 source, uint8 destination) public{
+  function createNewRequest(bytes32 request_id, bytes32 rider_id, bytes32 source_lat, bytes32 source_lon, bytes32 destination_lat, bytes32 destination_lon) public{
     num_booking_requests++;
 
-    booking_requests[request_id] = Booking_request(request_id, rider_id, source, destination, 0, 0, 0);
+    booking_requests[request_id] = Booking_request(request_id, rider_id, source_lat, source_lon, destination_lat, destination_lon, 0, 0, 0);
   }
 
-  function addQuotation(uint8 request_id, uint8 quotation_id, uint8 driver_id, uint8 quotation_amount) public{
+  function addQuotation(bytes32 request_id, bytes32 quotation_id, bytes32 driver_id, uint8 quotation_amount) public{
 
     Booking_request storage br = booking_requests[request_id];
     
@@ -59,7 +57,24 @@ contract Booking {
     br.num_quotations++;
   }
 
-  function getAllQuotations(uint8 request_id) view public returns (bytes32[]){
+  function selectQuotation(bytes32 request_id, bytes32 quotation_id) public{
+    booking_requests[request_id].chosen_quotation_id = quotation_id;
+  }
+
+  // TRANSPARENCY API ----------------------------------------------------------------------------------------------------------
+
+  function getNumRequests() view public returns (uint8){
+    return num_booking_requests;
+  }
+
+  function getReqDetails(bytes32 request_id) view public returns (bytes32, bytes32, bytes32, bytes32, bytes32, bytes32){
+
+    Booking_request storage br = booking_requests[request_id];
+    return(br.rider_id, br.source_lat, br.source_lon, br.destination_lat, br.destination_lon, br.chosen_quotation_id);
+
+  }
+
+  function getAllQuotations(bytes32 request_id) view public returns (bytes32[]){
     
     Booking_request storage br = booking_requests[request_id];
     
@@ -74,16 +89,10 @@ contract Booking {
     return quotation_map_ids;
   }
 
-
-  function getQuotationDetails(uint8 request_id, bytes32 quotation_map_id) view public returns (uint8, uint8, uint8){
+  function getQuotationDetails(bytes32 request_id, bytes32 quotation_map_id) view public returns (bytes32, bytes32, uint8){
     Booking_request storage br = booking_requests[request_id];
     Quotation memory quotation = br.quotations[quotation_map_id];
     return (quotation.quotation_id, quotation.driver_id, quotation.quotation_amount);
-  }
-
-
-  function selectQuotation(uint8 request_id, uint8 quotation_id) public{
-    booking_requests[request_id].chosen_quotation_id = quotation_id;
   }
   
 }
